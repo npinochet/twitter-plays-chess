@@ -18,7 +18,7 @@ upload_url = "https://upload.twitter.com/1.1/media/upload.json"
 
 auth = OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 
-def request(url, method="POST", params=None, headers=None, files=None):
+def request(method, url, params=None, headers=None, files=None):
 	res = None
 	trys = 3
 

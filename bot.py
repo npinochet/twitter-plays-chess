@@ -4,7 +4,7 @@ import chess, chess.svg, chess.engine, redis
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
-from tweet import post_tweet, get_tweet, upload_image
+from twitter import post_tweet, get_tweet, upload_image
 
 state = "new_game"
 default_thinking_time = 30
@@ -14,11 +14,11 @@ redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
 r = redis.from_url(redis_url)
 
 header_msgs = {
-	"new_game": "A brand new game vs de computer! I know you can beat him!",
-	"continue": "What would the best move be [think emoji], vote for the next move!",
-	"end_win": "Amazing! Twitter is the best chess player",
-	"end_lost": "Aww :( better luck next game!",
-	"end_draw": "It's a draw! nobody wins.",
+	"new_game": "A brand new game vs. de computer! Choose the starting move carefully!",
+	"continue": "Your turn! vote for the next move in the polls!",
+	"end_win": "Congratulations!!! Twitter has beaten the computer! Next game won't so easy!",
+	"end_lost": "The computer wins! It apears the computer is too much for twitter, next game will be easier",
+	"end_draw": "It's a draw! nobody wins. Better luck next time!",
 }
 
 move_msg = "{} {} to {}"
@@ -68,11 +68,11 @@ def get_next_move(board):
 
 	return chess.Move.from_uci(f+t+p)
 
-def post_main_tweet(board):
+def post_main_tweet(board, lastmove):
 	# generate board image
 	img_path = "chess.png"
 	with open("chess.svg", "w") as f:
-		f.write(chess.svg.board(board=board))
+		f.write(chess.svg.board(board=board, lastmove=lastmove, size=300))
 	renderPM.drawToFile(svg2rlg("chess.svg"), img_path, fmt="PNG")
 
 	media_id = upload_image(img_path)
@@ -120,13 +120,13 @@ def post_options(board, tweet_id):
 
 	return poll_ids
 
-def end_game(board):
+def end_game(board, lastmove):
 	state = "end_draw"
 	think_time = default_thinking_time
 	if r.exists("AI_thinking_time"):
 		think_time = int(r.get("AI_thinking_time"))
 
-	res = board.result()
+	res = board.result(claim_draw=True)
 
 	if res == "1-0":
 		state = "end_win"
@@ -140,16 +140,18 @@ def end_game(board):
 	if r.exists("poll_ids"):
 		r.delete("poll_ids")
 
-	post_main_tweet(board)
-	sys.exit("Game Done")
+	post_main_tweet(board, lastmove)
+	sys.exit("Game Over")
 
 if __name__ == "__main__":
 	board = get_board()
 	move = get_next_move(board)
+	lastmove = None
 	if move:
 		board.push(move)
+		lastmove = move
 
-	if board.turn == chess.BLACK and not board.is_game_over(True):
+	if board.turn == chess.BLACK and not board.is_game_over(claim_draw=True):
 		engine = chess.engine.SimpleEngine.popen_uci(["python3", "sunfish/uci.py"])
 		think_time = default_thinking_time
 		if r.exists("AI_thinking_time"):
@@ -157,11 +159,12 @@ if __name__ == "__main__":
 		result = engine.play(board, chess.engine.Limit(time=think_time))
 		engine.quit()
 		board.push(result.move)
+		lastmove = result.move
 
-	if board.is_game_over(True):
-		end_game(board)
+	if board.is_game_over(claim_draw=True):
+		end_game(board, lastmove)
 
-	tweet_id = post_main_tweet(board)
+	tweet_id = post_main_tweet(board, lastmove)
 	poll_ids = post_options(board, tweet_id)
 	r.set("poll_ids", json.dumps(poll_ids))
 	r.set("board", board.fen())
