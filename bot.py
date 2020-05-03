@@ -10,8 +10,44 @@ state = "new_game"
 default_thinking_time = 30
 thinking_time_step = 10
 
-redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
-r = redis.from_url(redis_url)
+#redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
+#r = redis.from_url(redis_url)
+
+# REDIS DEBUG CLASS
+class redis:
+	def __init__(self):
+		self.path = "data.redis"
+		self.data = {}
+
+	def get(self, name):
+		return self.data[name]
+
+	def set(self, name, value):
+		self.data[name] = value
+		self.save()
+		return True
+
+	def exists(self, name):
+		return name in self.data
+
+	def delete(self, name):
+		del self.data[name]
+		self.save()
+
+	def save(self):
+		with open("data.redis", "w") as f:
+			f.write(json.dumps(self.data))
+
+	def load(self):
+		with open("data.redis", "r") as f:
+			self.data = json.loads(f.read())
+
+	def clear(self):
+		with open("data.redis", "w") as f:
+			f.write(json.dumps({}))
+
+r = redis()
+r.load()
 
 header_msgs = {
 	"new_game": "A brand new game vs. de computer! Choose the starting move carefully!",
