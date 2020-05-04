@@ -164,7 +164,7 @@ if __name__ == "__main__":
 		if r.exists("AI_thinking_time"):
 			think_time = int(r.get("AI_thinking_time"))
 		try:
-			engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
+			engine = chess.engine.SimpleEngine.popen_uci("stockfish_20011801_x64_bmi2")
 			result = engine.play(board, chess.engine.Limit(time=think_time))
 		except chess.engine.EngineError as err:
 			engine.quit()
