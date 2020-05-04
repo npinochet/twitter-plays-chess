@@ -95,3 +95,8 @@ def upload_image(img_path):
 	files = {"media": open(img_path, "rb")}
 	res = request("POST", upload_url, files=files)
 	return res.json()["media_id_string"]
+
+def delete_tweet(tweet_id):
+	url = base_url + "statuses/destroy/" + str(tweet_id) + ".json"
+	res = request("POST", url)
+	return res.json()

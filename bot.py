@@ -4,7 +4,7 @@ import chess, chess.svg, chess.engine, redis
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
-from twitter import post_tweet, get_tweet, upload_image
+from twitter import post_tweet, get_tweet, upload_image, delete_tweet
 
 state = "new_game"
 default_thinking_time = 30
@@ -28,7 +28,7 @@ def get_board():
 	board = chess.Board()
 	if r.exists("board"):
 		state = "continue"
-		board.set_fen(r.get("board"))
+		board.set_fen(r.get("board").decode("utf-8"))
 	return board
 
 def get_next_move(board):
@@ -55,7 +55,9 @@ def get_next_move(board):
 				max_count = count
 				max_label = label
 
-	if max_count <= 0: # No move is selected
+	if max_count <= 0: # No move is selected, destroy current tweet
+		if r.exists("main_id"):
+			delete_tweet(r.get("main_id").decode("utf-8"))
 		return False
 
 	#parse label title
@@ -167,4 +169,5 @@ if __name__ == "__main__":
 	tweet_id = post_main_tweet(board, lastmove)
 	poll_ids = post_options(board, tweet_id)
 	r.set("poll_ids", json.dumps(poll_ids))
+	r.set("main_id", tweet_id)
 	r.set("board", board.fen())
