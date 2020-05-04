@@ -25,6 +25,7 @@ move_msg = "{} {} to {}"
 move_msg_prom = "{} {} to {} and promote {}"
 
 def get_board():
+	global state
 	board = chess.Board()
 	if r.exists("board"):
 		state = "continue"
@@ -123,6 +124,7 @@ def post_options(board, tweet_id):
 	return poll_ids
 
 def end_game(board, lastmove):
+	global state
 	state = "end_draw"
 	think_time = default_thinking_time
 	if r.exists("AI_thinking_time"):
