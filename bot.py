@@ -160,11 +160,15 @@ if __name__ == "__main__":
 		lastmove = move
 
 	if board.turn == chess.BLACK and not board.is_game_over(claim_draw=True):
-		engine = chess.engine.SimpleEngine.popen_uci(["python3", "sunfish/uci.py"])
 		think_time = default_thinking_time
 		if r.exists("AI_thinking_time"):
 			think_time = int(r.get("AI_thinking_time"))
-		result = engine.play(board, chess.engine.Limit(time=think_time))
+		try:
+			engine = chess.engine.SimpleEngine.popen_uci("/usr/bin/stockfish")
+			result = engine.play(board, chess.engine.Limit(time=think_time))
+		except chess.engine.EngineError as err:
+			engine.quit()
+			sys.exit(err)
 		engine.quit()
 		board.push(result.move)
 		lastmove = result.move

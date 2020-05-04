@@ -8,7 +8,7 @@ A [twitter bot](https://twitter.com/ChessAwesome) to play chess against a comput
 A single run will:
 * Get the current board using Redis
 * Get the results of the last polls (program exists if polls aren't closed)
-* Make the AI play (against [Sunfish](https://github.com/thomasahle/sunfish))
+* Make the AI play (against [Stockfish](https://stockfishchess.org/))
 * Check if the game is over
 * Post new board and polls
 
