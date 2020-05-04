@@ -10,9 +10,6 @@ state = "new_game"
 default_thinking_time = 30
 thinking_time_step = 10
 
-redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
-r = redis.from_url(redis_url)
-
 header_msgs = {
 	"new_game": "A brand new game vs. de computer! Choose the starting move carefully!",
 	"continue": "Your turn! vote for the next move in the polls!",
@@ -23,6 +20,10 @@ header_msgs = {
 
 move_msg = "{} {} to {}"
 move_msg_prom = "{} {} to {} and promote {}"
+
+filler_text = "---"
+redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
+r = redis.from_url(redis_url)
 
 def get_board():
 	global state
@@ -56,7 +57,7 @@ def get_next_move(board):
 				max_count = count
 				max_label = label
 
-	if max_count <= 0: # No move is selected, destroy current tweet
+	if max_count <= 0 or max_label == filler_text: # No move is selected, destroy current tweet
 		if r.exists("main_id"):
 			delete_tweet(r.get("main_id").decode("utf-8"))
 		return False
@@ -108,7 +109,7 @@ def post_options(board, tweet_id):
 
 		# Make sure we don't leave a poll with only 1 options (tweeter doesn't accept this)
 		if len(op) % 4 == 1:
-			op.append("---")
+			op.append(filler_text)
 
 		op = [op[i:i + 4] for i in range(0, len(op), 4)]
 
@@ -151,6 +152,9 @@ if __name__ == "__main__":
 	board = get_board()
 	move = get_next_move(board)
 	lastmove = None
+	if r.exists("lastmove"):
+		uci = r.get("lastmove").decode("utf-8")
+		lastmove = chess.Move.from_uci(uci)
 	if move:
 		board.push(move)
 		lastmove = move
@@ -173,3 +177,5 @@ if __name__ == "__main__":
 	r.set("poll_ids", json.dumps(poll_ids))
 	r.set("main_id", tweet_id)
 	r.set("board", board.fen())
+	if lastmove:
+		r.set("lastmove", lastmove.uci())
