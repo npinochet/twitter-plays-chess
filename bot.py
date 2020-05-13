@@ -1,4 +1,4 @@
-import sys, json, os
+import os, sys, pickle
 
 import chess, chess.svg, chess.engine, redis
 from svglib.svglib import svg2rlg
@@ -7,8 +7,8 @@ from reportlab.graphics import renderPM
 from twitter import post_tweet, get_tweet, upload_image, delete_tweet
 
 state = "new_game"
-default_thinking_time = 30
-thinking_time_step = 10
+default_thinking_time = 15
+thinking_time_step = 5
 
 header_msgs = {
 	"new_game": "A brand new game vs. de computer! Choose the starting move carefully!",
@@ -20,6 +20,7 @@ header_msgs = {
 
 move_msg = "{} {} to {}"
 move_msg_prom = "{} {} to {} and promote {}"
+lastmove_text = None
 
 filler_text = "---"
 redis_url = os.getenv('REDISTOGO_URL', 'redis://localhost:6379')
@@ -30,14 +31,14 @@ def get_board():
 	board = chess.Board()
 	if r.exists("board"):
 		state = "continue"
-		board.set_fen(r.get("board").decode("utf-8"))
+		board = pickle.loads(r.get("board"))
 	return board
 
 def get_next_move(board):
 	if not r.exists("poll_ids"):
 		return False
 
-	poll_ids = json.loads(r.get("poll_ids"))
+	poll_ids = pickle.loads(r.get("poll_ids"))
 
 	max_count = -1
 	max_label = ""
@@ -58,10 +59,14 @@ def get_next_move(board):
 				max_label = label
 
 	if max_count <= 0 or max_label == filler_text: # No move is selected, destroy current tweet
+		for tweet in poll_ids:
+			delete_tweet(tweet)
 		if r.exists("main_id"):
 			delete_tweet(r.get("main_id").decode("utf-8"))
 		return False
 
+	global lastmove_text
+	lastmove_text = max_label
 	#parse label title
 	sp = max_label.split(" ")
 	f = sp[1].lower()
@@ -72,15 +77,26 @@ def get_next_move(board):
 
 	return chess.Move.from_uci(f+t+p)
 
-def post_main_tweet(board, lastmove):
+def post_main_tweet(board):
+	text = header_msgs[state]
+	peek = board.peek() if len(board.move_stack) > 0 else None
+	arrow = []
+
+	if state != "new_game":
+		if lastmove_text:
+			text = text + "\nLast move chosen: " + lastmove_text
+		if len(board.move_stack) >= 2:
+			m = board.move_stack[-2] if board.turn == chess.WHITE else peek
+			arrow = [(m.from_square, m.to_square)] if m else arrow
+
 	# generate board image
 	img_path = "chess.png"
 	with open("chess.svg", "w") as f:
-		f.write(chess.svg.board(board=board, lastmove=lastmove, size=300))
+		f.write(chess.svg.board(board=board, lastmove=peek, arrows=arrow, size=400))
 	renderPM.drawToFile(svg2rlg("chess.svg"), img_path, fmt="PNG")
 
 	media_id = upload_image(img_path)
-	return post_tweet(header_msgs[state], media_id=media_id)
+	return post_tweet(text, media_id=media_id)
 
 def post_options(board, tweet_id):
 	order = [chess.QUEEN, chess.KING, chess.ROOK, chess.BISHOP, chess.KNIGHT, chess.PAWN]
@@ -124,7 +140,7 @@ def post_options(board, tweet_id):
 
 	return poll_ids
 
-def end_game(board, lastmove):
+def end_game(board):
 	global state
 	state = "end_draw"
 	think_time = default_thinking_time
@@ -145,19 +161,14 @@ def end_game(board, lastmove):
 	if r.exists("poll_ids"):
 		r.delete("poll_ids")
 
-	post_main_tweet(board, lastmove)
+	post_main_tweet(board)
 	sys.exit("Game Over")
 
 if __name__ == "__main__":
 	board = get_board()
 	move = get_next_move(board)
-	lastmove = None
-	if r.exists("lastmove"):
-		uci = r.get("lastmove").decode("utf-8")
-		lastmove = chess.Move.from_uci(uci)
 	if move:
 		board.push(move)
-		lastmove = move
 
 	if board.turn == chess.BLACK and not board.is_game_over(claim_draw=True):
 		think_time = default_thinking_time
@@ -171,15 +182,12 @@ if __name__ == "__main__":
 			sys.exit(err)
 		engine.quit()
 		board.push(result.move)
-		lastmove = result.move
 
 	if board.is_game_over(claim_draw=True):
-		end_game(board, lastmove)
+		end_game(board)
 
-	tweet_id = post_main_tweet(board, lastmove)
+	tweet_id = post_main_tweet(board)
 	poll_ids = post_options(board, tweet_id)
-	r.set("poll_ids", json.dumps(poll_ids))
+	r.set("poll_ids", pickle.dumps(poll_ids))
 	r.set("main_id", tweet_id)
-	r.set("board", board.fen())
-	if lastmove:
-		r.set("lastmove", lastmove.uci())
+	r.set("board", pickle.dumps(board))
