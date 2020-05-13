@@ -79,7 +79,10 @@ def post_tweet(text, entries=None, duration=20, reply_id=None, reply_name=twitte
 		params["media_ids"] = [int(media_id)]
 
 	res = request("POST", base_url + "statuses/update.json", params=params)
+	if not res:
+		return False
 	return res.json()["id_str"]
+
 
 def get_tweet(tweet_id):
 	params = {
@@ -89,14 +92,20 @@ def get_tweet(tweet_id):
 	}
 
 	res = request("GET", base_url + "statuses/show.json", params=params)
+	if not res:
+		return False
 	return res.json()
 
 def upload_image(img_path):
 	files = {"media": open(img_path, "rb")}
 	res = request("POST", upload_url, files=files)
+	if not res:
+		return False
 	return res.json()["media_id_string"]
 
 def delete_tweet(tweet_id):
 	url = base_url + "statuses/destroy/" + str(tweet_id) + ".json"
 	res = request("POST", url)
+	if not res:
+		return False
 	return res.json()

@@ -96,7 +96,18 @@ def post_main_tweet(board):
 	renderPM.drawToFile(svg2rlg("chess.svg"), img_path, fmt="PNG")
 
 	media_id = upload_image(img_path)
-	return post_tweet(text, media_id=media_id)
+	if not media_id:
+		panic_clean_tweets()
+	tweet_id = post_tweet(text, media_id=media_id)
+	if not tweet_id:
+		panic_clean_tweets()
+	return tweet_id
+
+def panic_clean_tweets(tweets=[]):
+	print("Error, cleaning tweets")
+	for ids in tweets:
+		delete_tweet(ids)
+	sys.exit("Tweets cleaned, some error must have happened")
 
 def post_options(board, tweet_id):
 	order = [chess.QUEEN, chess.KING, chess.ROOK, chess.BISHOP, chess.KNIGHT, chess.PAWN]
@@ -130,13 +141,17 @@ def post_options(board, tweet_id):
 		op = [op[i:i + 4] for i in range(0, len(op), 4)]
 
 		head_tweet_id = post_tweet(p + " Moves:", reply_id=tweet_id, entries=op.pop(0))
+		if not head_tweet_id:
+			poll_ids.append(tweet_id)
+			panic_clean_tweets(poll_ids)
 
-		if head_tweet_id:
-			poll_ids.append(head_tweet_id)
+		poll_ids.append(head_tweet_id)
 		for poll_ops in op:
 			head_tweet_id = post_tweet(p + " cont...", reply_id=head_tweet_id, entries=poll_ops)
-			if head_tweet_id:
-				poll_ids.append(head_tweet_id)
+			if not head_tweet_id:
+				poll_ids.append(tweet_id)
+				panic_clean_tweets(poll_ids)
+			poll_ids.append(head_tweet_id)
 
 	return poll_ids
 
