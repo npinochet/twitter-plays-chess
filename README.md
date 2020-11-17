@@ -1,13 +1,13 @@
 # Twitter Plays Chess
 
-A [twitter bot](https://twitter.com/ChessAwesome) to play chess against a computer using polls.
+A [Twitter bot](https://twitter.com/EveryoneChess) to play chess against a computer using polls.
 
 ## How to run
 `python bot.py`
 
 A single run will:
 * Get the current board using Redis
-* Get the results of the last polls (program exists if polls aren't closed)
+* Get the results of the last polls (program exits if polls aren't closed)
 * Make the AI play (against [Stockfish](https://stockfishchess.org/))
 * Check if the game is over
 * Post new board and polls
